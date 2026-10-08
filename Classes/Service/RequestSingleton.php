@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace Pixelant\Demander\Service;
 
+use TYPO3\CMS\Core\SingletonInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
-class RequestSingleton implements \TYPO3\CMS\Core\SingletonInterface
+class RequestSingleton implements SingletonInterface
 {
     private static $uniqueInstance = null;
 
     /**
      * @var ServerRequestInterface
      */
-    private $request;
+    private ?ServerRequestInterface $request = null;
 
     public static function getInstance(): ?self
     {
@@ -41,7 +42,7 @@ class RequestSingleton implements \TYPO3\CMS\Core\SingletonInterface
      * @param ServerRequestInterface $request
      * @return RequestSingleton
      */
-    public function setRequest(ServerRequestInterface $request): self
+    public function setRequest(?ServerRequestInterface $request): self
     {
         $this->request = $request;
 

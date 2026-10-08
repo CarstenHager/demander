@@ -1,0 +1,149 @@
+### static.txt
+{
+  "demander": {
+    "php": 18,
+    "json": 1,
+    "xml": 1,
+    "xlf": 0,
+    "yaml": 1,
+    "yml": 3
+  },
+  "pxa_product_manager": {
+    "php": 205,
+    "json": 3,
+    "xml": 38,
+    "xlf": 5,
+    "yaml": 2,
+    "yml": 4
+  }
+}
+Static checks completed: PHP, JSON, XML/XLF, YAML, new ES modules
+
+### functional.txt
+PASS: Frontend visibility excludes hidden and future products
+PASS: Category AND selects products in both categories
+PASS: Attribute AND selects all requested options
+PASS: Demander filter {"name":"O'Reilly"}
+PASS: Demander filter {"name":"' OR 1=1 --"}
+PASS: Demander filter {"price":{"min":12.4,"max":12.6}}
+PASS: Demander filter {"or":{"name":"Alpha","price":{"min":12.4,"max":12.6}}}
+PASS: POST overrides GET demands
+PASS: Missing demand payload handled safely
+PASS: Lazy loading count
+PASS: Available categories from parameterized product subquery
+PASS: Available attribute options from product subquery
+PASS: Extbase maps complete product rows
+PASS: Dynamic TCA attributes use TYPO3 12 select item structure
+Functional checks completed
+PASS: Middleware exposes active request
+PASS: Middleware preserves handler exceptions
+PASS: Middleware restores request after exception
+PASS: Sort whitelist: name,DESC
+PASS: Sort whitelist: name,ASC; DROP TABLE pages
+PASS: Sort whitelist: not_configured,ASC
+PASS: Additional configured OR restriction honors table alias
+Extra Demander checks completed
+
+### backend.txt
+PASS DataHandler parent save: []
+PASS Parent values inherited by child
+PASS Backend FormData compilation attribute type 1
+PASS Backend FormData compilation attribute type 2
+PASS Backend FormData compilation attribute type 3
+PASS Backend FormData compilation attribute type 4
+PASS Backend FormData compilation attribute type 5
+PASS Backend FormData compilation attribute type 6
+PASS Backend FormData compilation attribute type 7
+PASS Backend FormData compilation attribute type 8
+PASS Backend FormData compilation attribute type 9
+PASS Backend FormData compilation attribute type 10
+Backend checks completed
+PASS Link browser renders product records
+PASS PSR-14 link explanation
+Extended backend checks completed
+
+### http.txt
+PASS: Product list HTML HTTP 200
+PASS: Product detail HTML HTTP 200
+PASS: Products JSON HTTP 200, 2 products
+PASS: Available filters JSON HTTP 200, countAll=2
+HTTP checks completed
+
+### cli.txt
+
+COMMAND cache:warmup
+EXIT 0
+
+COMMAND productmanager:updateinheritance --rebuild-queue true
+EXIT 0
+
+Checks inheritance to child products and updates it if needed.
+==============================================================
+
+Rebuilding inheritance queue.
+-----------------------------
+
+0 product(s) where added to inheritance queue.
+
+ [OK] No products in queue, no processing needed.                               
+
+
+COMMAND productmanager:updaterelationinheritanceindex
+EXIT 0
+
+Update relation inheritance index.
+==================================
+
+Fetching missing relations
+--------------------------
+
+ [OK] No missing relations found                                                
+
+
+COMMAND productmanager:removeorphanattributevalues
+EXIT 0
+
+Removes orphan attribute values, attribute values without a product attached to it.
+===================================================================================
+
+Fetching orphant attribute values count
+---------------------------------------
+
+ [OK] No orphant attribute values found                                         
+
+
+COMMAND productmanager:fixduplicateattributevalues --no-interaction
+EXIT 0
+
+Fixes duplicate attribute values.
+=================================
+
+Fetching duplicate attribute values
+-----------------------------------
+
+ [OK] No duplicate attribute values found                                       
+
+
+### cli-inheritance.txt
+
+Checks inheritance to child products and updates it if needed.
+==============================================================
+
+Rebuilding inheritance queue.
+-----------------------------
+
+1 product(s) where added to inheritance queue.
+
+Check inheritance status for 1 of 1 product(s) total in queue.
+--------------------------------------------------------------
+
+Check inheritance for product [2] (1/1)
+---------------------------------------
+
+Inherited data was updated for product: 2, fields: price,attributes_values
+
+ [OK] Inheritance status was checked for 1 product(s) and updated on 1          
+      product(s).                                                               
+
+
+PASS: CLI updated child price from 9 to 31.25
