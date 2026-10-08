@@ -32,7 +32,7 @@ class DemandArrayUtility
      */
     public static function propertyNameToTableAndFieldName(string $string): ?array
     {
-        return explode('-', $string);
+        return array_pad(explode('-', $string, 2), 2, '');
     }
 
     /**
@@ -45,44 +45,26 @@ class DemandArrayUtility
      */
     public static function toExpression(array $properties, ExpressionBuilder $expressionBuilder, string $conjunction = 'and'): CompositeExpression
     {
-        $expressionsArr = [];
-
-        if (is_array($properties[array_key_first($properties)])) {
-            foreach ($properties as  $property) {
-                $expressionsArr[] = self::toExpression($property, $expressionBuilder);
+        $expressions = [];
+        if (isset($properties['field'], $properties['alias']) && array_key_exists('value', $properties)) {
+            $field = $properties['alias'] . '.' . $properties['field'];
+            $expressions[] = self::convertRestrictionToExpression($field, $properties, $expressionBuilder);
+            foreach ($properties['additionalRestriction'] ?? [] as $key => $restriction) {
+                [$table, $column] = array_pad(explode('-', $key, 2), 2, '');
+                if ($column !== '') {
+                    $conjunction = $restriction['conjunction'] ?? $conjunction;
+                    $alias = $table === ($properties['table'] ?? '') ? $properties['alias'] : $table;
+                    $expressions[] = self::convertRestrictionToExpression($alias . '.' . $column, $restriction, $expressionBuilder);
+                }
             }
         } else {
-            $fieldName = $properties['alias'] . '.' . $properties['field'];
-            $tempRestrictions = [];
-            $tempConjunction = '';
-
-            if ($properties['additionalRestriction']) {
-                foreach ($properties['additionalRestriction'] as $key => $additionalRestriction) {
-                    [$table, $field] = self::propertyNameToTableAndFieldName($key);
-                    $tempFieldName = $table . '.' . $field;
-                    $tempConjunction = $additionalRestriction['conjunction'];
-                    $tempRestrictions[] = self::convertRestrictionToExpression($tempFieldName, $additionalRestriction, $expressionBuilder);
+            foreach ($properties as $key => $property) {
+                if (is_array($property)) {
+                    $expressions[] = self::toExpression($property, $expressionBuilder, $key === 'or' ? 'or' : 'and');
                 }
             }
-
-            if (!empty($tempRestrictions)) {
-                $tempRestrictions[] = self::convertRestrictionToExpression($fieldName, $properties, $expressionBuilder);
-
-                if ($tempConjunction === 'or') {
-                    $expressionsArr[] = $expressionBuilder->orX(...$tempRestrictions);
-                } else {
-                    $expressionsArr[] = $expressionBuilder->andX(...$tempRestrictions);
-                }
-            } else {
-                $expressionsArr[] = self::convertRestrictionToExpression($fieldName, $properties, $expressionBuilder);
-            }
         }
-
-        if ($conjunction === 'or') {
-            return $expressionBuilder->orX(...$expressionsArr);
-        }
-
-        return $expressionBuilder->andX(...$expressionsArr);
+        return $conjunction === 'or' ? $expressionBuilder->or(...$expressions) : $expressionBuilder->and(...$expressions);
     }
 
     /**
@@ -142,26 +124,36 @@ class DemandArrayUtility
      */
     public static function convertRestrictionToExpression(string $fieldname, array $restrictions, ExpressionBuilder $expressionBuilder): string
     {
-        switch ($restrictions['operator']) {
-            case $expressionBuilder::EQ:
-                return $expressionBuilder->eq($fieldname, $restrictions['value']);
-            case $expressionBuilder::GT:
-                return $expressionBuilder->gt($fieldname, $restrictions['value']);
-            case $expressionBuilder::GTE:
-                return $expressionBuilder->gte($fieldname, $restrictions['value']);
-            case $expressionBuilder::LT:
-                return $expressionBuilder->lt($fieldname, $restrictions['value']);
-            case $expressionBuilder::LTE:
-                return $expressionBuilder->lte($fieldname, $restrictions['value']);
-            case '-':
-                return $expressionBuilder->andX(
-                    $expressionBuilder->gte($fieldname, $restrictions['value']['min']),
-                    $expressionBuilder->lte($fieldname, $restrictions['value']['max'])
-                )->__toString();
-            case 'in':
-                return $expressionBuilder->in($fieldname, $restrictions['value']);
-            default:
-                return $fieldname;
+        $value = $restrictions['value'] ?? null;
+        $operator = $restrictions['operator'] ?? '=';
+        // Die API nimmt einen ExpressionBuilder entgegen. Dessen literal() quotiert Werte
+        // über die aktive Datenbankverbindung; Benutzereingaben werden nie als SQL eingesetzt.
+        $quote = static function ($item) use ($expressionBuilder): string {
+            if (!is_scalar($item) && $item !== null) {
+                throw new \InvalidArgumentException('Demand values must be scalar.', 1728300001);
+            }
+            return (string)$expressionBuilder->literal((string)$item);
+        };
+        if ($operator === 'in') {
+            $values = is_array($value) ? $value : explode(',', (string)$value);
+            return $values === [] ? '1=0' : $expressionBuilder->in($fieldname, array_map($quote, $values));
         }
+        if ($operator === '-') {
+            if (!is_array($value) && preg_match('/^(-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)$/', (string)$value, $matches)) {
+                $value = ['min' => $matches[1], 'max' => $matches[2]];
+            }
+            if (!is_array($value) || !isset($value['min'], $value['max'])) {
+                return '1=0';
+            }
+            return (string)$expressionBuilder->and(
+                $expressionBuilder->gte($fieldname, $quote($value['min'])),
+                $expressionBuilder->lte($fieldname, $quote($value['max']))
+            );
+        }
+        $methods = ['=' => 'eq', '>' => 'gt', '>=' => 'gte', '<' => 'lt', '<=' => 'lte', '<>' => 'neq'];
+        if (!isset($methods[$operator]) || (!is_scalar($value) && $value !== null)) {
+            return '1=0';
+        }
+        return $expressionBuilder->{$methods[$operator]}($fieldname, $quote($value));
     }
 }

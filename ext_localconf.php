@@ -1,10 +1,12 @@
 <?php
 
+defined('TYPO3') || die;
+
 (function ()
 {
     $GLOBALS['TYPO3_CONF_VARS']['FE']['defaultRestrictionTypes'] = [
         \TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction::class,
-        \TYPO3\CMS\Core\Database\Query\Restriction\FrontendWorkspaceRestriction::class,
+        \TYPO3\CMS\Core\Database\Query\Restriction\WorkspaceRestriction::class,
         \TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction::class,
         \TYPO3\CMS\Core\Database\Query\Restriction\StartTimeRestriction::class,
         \TYPO3\CMS\Core\Database\Query\Restriction\EndTimeRestriction::class,

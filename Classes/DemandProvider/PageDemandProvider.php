@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Pixelant\Demander\DemandProvider;
 
-use TYPO3\CMS\Extbase\Persistence\Generic\Exception\NotImplementedException;
+use BadMethodCallException;
 
 class PageDemandProvider implements DemandProviderInterface
 {
@@ -14,6 +14,6 @@ class PageDemandProvider implements DemandProviderInterface
      */
     public function getDemand(): array
     {
-        throw new NotImplementedException(__METHOD__, 1614083012);
+        throw new BadMethodCallException(__METHOD__, 1614083012);
     }
 }

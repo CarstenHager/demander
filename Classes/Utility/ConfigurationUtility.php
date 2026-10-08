@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Pixelant\Demander\Utility;
 
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Extbase\Configuration\ConfigurationManager;
+use TYPO3\CMS\Extbase\Configuration\ConfigurationManagerInterface;
 
 /**
  * Utility for demander typoscript configuration.
@@ -17,9 +17,12 @@ class ConfigurationUtility
      */
     public static function getExtensionConfiguration(): array
     {
-        $configurationManager = GeneralUtility::makeInstance(ConfigurationManager::class);
-        $config = $configurationManager->getConfiguration(ConfigurationManager::CONFIGURATION_TYPE_FULL_TYPOSCRIPT)['config.']['tx_demander.'];
+        $configurationManager = GeneralUtility::makeInstance(ConfigurationManagerInterface::class);
+        $fullTypoScript = (array)$configurationManager->getConfiguration(
+            ConfigurationManagerInterface::CONFIGURATION_TYPE_FULL_TYPOSCRIPT
+        );
+        $config = $fullTypoScript['config.']['tx_demander.'] ?? [];
 
-        return DemandArrayUtility::removeDotsFromKeys($config);
+        return DemandArrayUtility::removeDotsFromKeys(is_array($config) ? $config : []);
     }
 }
