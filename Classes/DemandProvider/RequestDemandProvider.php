@@ -11,15 +11,17 @@ class RequestDemandProvider implements DemandProviderInterface
 {
     public function getDemand(): array
     {
-        $request = RequestSingleton::getInstance()->getRequest() ?? null;
-        if ($request instanceof ServerRequestInterface) {
-            $demands = $request->getParsedBody()['d'];
+        $request = RequestSingleton::getInstance()->getRequest() ?? ($GLOBALS['TYPO3_REQUEST'] ?? null);
+        if (!$request instanceof ServerRequestInterface) {
+            return [];
         }
-
-        if ($demands) {
-            return $demands;
+        $query = $request->getQueryParams()['d'] ?? [];
+        $body = $request->getParsedBody();
+        $posted = is_array($body) ? ($body['d'] ?? []) : [];
+        $demands = is_array($query) ? $query : [];
+        if (is_array($posted)) {
+            \TYPO3\CMS\Core\Utility\ArrayUtility::mergeRecursiveWithOverrule($demands, $posted);
         }
-
-        return [];
+        return $demands;
     }
 }

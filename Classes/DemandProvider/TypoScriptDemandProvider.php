@@ -15,7 +15,7 @@ class TypoScriptDemandProvider implements DemandProviderInterface
     {
         $config = ConfigurationUtility::getExtensionConfiguration();
 
-        if ($config['demands']) {
+        if (!empty($config['demands']) && is_array($config['demands'])) {
             return $config['demands'];
         }
 

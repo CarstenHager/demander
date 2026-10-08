@@ -2,18 +2,31 @@
   "name": "pixelant/demander",
   "type": "typo3-cms-extension",
   "description": "Configurable, demand-based filtering framework with permalink-support for TYPO3.",
-  "license": ["GPL-2.0-or-later"],
-  "keywords": ["TYPO3 CMS"],
+  "license": [
+    "GPL-2.0-or-later"
+  ],
+  "keywords": [
+    "TYPO3 CMS"
+  ],
   "authors": [
     {
       "name": "Pixelant",
       "email": "info@pixelant.net",
       "homepage": "https://www.pixelant.net",
       "role": "Developer"
+    },
+    {
+      "name": "teufels GmbH",
+      "email": "hallo@teufels.com",
+      "homepage": "https://teufels.com/",
+      "role": "Developer"
     }
   ],
   "require": {
-    "typo3/cms-core": "^10.4.6 || ^11.5"
+    "typo3/cms-core": "^12.4",
+    "php": ">=8.1 <8.4",
+    "typo3/cms-extbase": "^12.4",
+    "doctrine/dbal": "^3.6"
   },
   "require-dev": {
     "codeception/codeception": "^4.1.5",
@@ -39,11 +52,11 @@
   },
   "prefer-stable": true,
   "config": {
-      "preferred-install": {
-          "*": "dist"
-      },
-      "sort-packages": true,
-      "vendor-dir": ".Build/vendor"
+    "preferred-install": {
+      "*": "dist"
+    },
+    "sort-packages": true,
+    "vendor-dir": ".Build/vendor"
   },
   "scripts": {
     "ci:php:lint": "find *.php Classes Configuration Tests -name '*.php' -print0 | xargs -0 -n 1 -P 4 php -l",
@@ -58,36 +71,36 @@
       "find 'Tests/Functional' -wholename '*Test.php' | parallel --gnu 'echo; echo \"Running functional test suite locally (requires php-sqlite3) {}\"; .Build/vendor/bin/phpunit -c .Build/vendor/nimut/testing-framework/res/Configuration/FunctionalTests.xml {}';"
     ],
     "ci:tests": [
-        "@ci:tests:unit",
-        "@ci:tests:functional"
+      "@ci:tests:unit",
+      "@ci:tests:functional"
     ],
     "ci:dynamic": [
-        "@ci:tests"
+      "@ci:tests"
     ],
     "ci:php": [
-        "@ci:php:codestyle"
+      "@ci:php:codestyle"
     ],
     "ci:static": [
-        "@ci:php:lint",
-        "@ci:php:sniff",
-        "@ci:ts:lint"
+      "@ci:php:lint",
+      "@ci:php:sniff",
+      "@ci:ts:lint"
     ],
     "ci": [
-        "@ci:static"
+      "@ci:static"
     ],
     "link-extension": [
-        "@php -r 'is_dir($extFolder=__DIR__.\"/.Build/public/typo3conf/ext/\") || mkdir($extFolder, 0777, true);'",
-        "@php -r 'file_exists($extFolder=__DIR__.\"/.Build/public/typo3conf/ext/pxa_product_manager\") || symlink(__DIR__,$extFolder);'"
+      "@php -r 'is_dir($extFolder=__DIR__.\"/.Build/public/typo3conf/ext/\") || mkdir($extFolder, 0777, true);'",
+      "@php -r 'file_exists($extFolder=__DIR__.\"/.Build/public/typo3conf/ext/pxa_product_manager\") || symlink(__DIR__,$extFolder);'"
     ],
     "fix:php:cs": "php-cs-fixer fix --config .php_cs.php",
     "fix:php": [
-        "@fix:php:cs"
+      "@fix:php:cs"
     ],
     "docs:generate": [
       "docker run --rm t3docs/render-documentation show-shell-commands > tempfile.sh; echo 'dockrun_t3rd makehtml' >> tempfile.sh; bash tempfile.sh; rm tempfile.sh"
     ],
     "post-autoload-dump": [
-        "@link-extension"
+      "@link-extension"
     ]
   },
   "extra": {
@@ -99,5 +112,6 @@
       "web-dir": ".Build/public",
       "extension-key": "demander"
     }
-  }
+  },
+  "version": "0.3.1-beta2"
 }

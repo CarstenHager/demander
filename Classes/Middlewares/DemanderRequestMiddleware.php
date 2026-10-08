@@ -14,12 +14,13 @@ class DemanderRequestMiddleware implements MiddlewareInterface
 {
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        $demands = $request->getParsedBody();
-
-        if (isset($demands['d'])) {
-            RequestSingleton::getInstance()->setRequest($request);
+        $storage = RequestSingleton::getInstance();
+        $previousRequest = $storage->getRequest();
+        $storage->setRequest($request);
+        try {
+            return $handler->handle($request);
+        } finally {
+            $storage->setRequest($previousRequest);
         }
-
-        return $handler->handle($request);
     }
 }

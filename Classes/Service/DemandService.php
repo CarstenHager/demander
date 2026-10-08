@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pixelant\Demander\Service;
 
+use TYPO3\CMS\Core\SingletonInterface;
 use Pixelant\Demander\DemandProvider\DemandProviderInterface;
 use Pixelant\Demander\Utility\ConfigurationUtility;
 use Pixelant\Demander\Utility\DemandArrayUtility;
@@ -17,7 +18,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 /**
  * Main API entry point for using demands from the Demander Extension.
  */
-class DemandService implements \TYPO3\CMS\Core\SingletonInterface
+class DemandService implements SingletonInterface
 {
     /**
      * Get active demand restrictions using configured DemandProviders.
@@ -70,7 +71,7 @@ class DemandService implements \TYPO3\CMS\Core\SingletonInterface
         array $tables,
         ExpressionBuilder $expressionBuilder
     ): CompositeExpression {
-        $demandArray = DemandArrayUtility::restrictionsToInt($demandArray);
+        // Werte bleiben unverändert: Dezimalzahlen und Artikelnummern mit führenden Nullen.
         $properties = $this->getPropertiesForDemandedTables($tables, $demandArray);
         $expressions = [];
 
@@ -82,13 +83,13 @@ class DemandService implements \TYPO3\CMS\Core\SingletonInterface
             }
         }
 
-        $defaultConjunction = ConfigurationUtility::getExtensionConfiguration()['defaultConjunction'];
+        $defaultConjunction = ConfigurationUtility::getExtensionConfiguration()['defaultConjunction'] ?? 'and';
 
         if ($defaultConjunction === 'or') {
-            return $expressionBuilder->orX(...$expressions);
+            return $expressionBuilder->or(...$expressions);
         }
 
-        return $expressionBuilder->andX(...$expressions);
+        return $expressionBuilder->and(...$expressions);
     }
 
     /**
@@ -143,13 +144,13 @@ class DemandService implements \TYPO3\CMS\Core\SingletonInterface
     public function getUiConfigurationForProperty(string $propertyName): array
     {
         [$table, $field] = UiArrayUtility::propertyNameToTableAndFieldName($propertyName);
-        $tcaConfiguration = $GLOBALS['TCA'][$table]['columns'][$field];
+        $tcaConfiguration = $GLOBALS['TCA'][$table]['columns'][$field] ?? [];
 
         if (!$tcaConfiguration) {
             return [];
         }
 
-        $config = ConfigurationUtility::getExtensionConfiguration()[$table][$field];
+        $config = ConfigurationUtility::getExtensionConfiguration()['ui'][$propertyName] ?? [];
 
         return UiArrayUtility::overrideProperties($config, $tcaConfiguration);
     }
@@ -186,10 +187,10 @@ class DemandService implements \TYPO3\CMS\Core\SingletonInterface
     {
         $outerBounds = [];
         $uiConfiguration = $this->getUiConfigurationForProperty($propertyName);
-        $type = $uiConfiguration['config']['type'];
+        $type = $uiConfiguration['config']['type'] ?? '';
 
         if ($type === 'select' || $type === 'check' || $type === 'radio') {
-            $outerBounds = $uiConfiguration['config']['items'];
+            $outerBounds = $uiConfiguration['config']['items'] ?? [];
         }
 
         return $outerBounds;
@@ -218,18 +219,12 @@ class DemandService implements \TYPO3\CMS\Core\SingletonInterface
      */
     public function getInnerBoundsForProperty(string $propertyName): array
     {
-        $innerBounds = [];
         $demands = $this->getDemandsFromDemandProviders();
-        $restrictions = array_column($demands, $propertyName);
-
-        foreach ($restrictions as $restriction) {
-            if (is_array($restriction['value'])) {
-                return $restriction['value'];
-            }
-            $innerBounds[] = $restriction['value'];
+        $value = $demands[$propertyName] ?? [];
+        if (is_array($value) && array_key_exists('value', $value)) {
+            $value = $value['value'];
         }
-
-        return $innerBounds;
+        return is_array($value) ? $value : [$value];
     }
 
     /**
@@ -242,7 +237,8 @@ class DemandService implements \TYPO3\CMS\Core\SingletonInterface
         $config = ConfigurationUtility::getExtensionConfiguration();
         $demandProviders = [];
 
-        if (!empty($config['demandProviders'])) {
+        if (!empty($config['demandProviders']) && is_array($config['demandProviders'])) {
+            ksort($config['demandProviders'], SORT_NUMERIC);
             foreach ($config['demandProviders'] as $id => $demandProvider) {
                 $demandProviders[$id] = GeneralUtility::makeInstance($demandProvider);
             }
@@ -259,13 +255,9 @@ class DemandService implements \TYPO3\CMS\Core\SingletonInterface
     protected function getDemandsFromDemandProviders(): array
     {
         $demands = [];
-        $demandProviders = $this->getConfiguredDemandProviders();
-
-        foreach ($demandProviders as $id => $object) {
-            $demand = $object->getDemand();
-            $demands = array_merge_recursive($demands, $demand);
+        foreach ($this->getConfiguredDemandProviders() as $provider) {
+            ArrayUtility::mergeRecursiveWithOverrule($demands, $provider->getDemand());
         }
-
         return $demands;
     }
 
@@ -278,58 +270,30 @@ class DemandService implements \TYPO3\CMS\Core\SingletonInterface
      */
     protected function getPropertiesForDemandedTables(array $tables, array $demands): array
     {
-        $properties = ConfigurationUtility::getExtensionConfiguration()['properties'];
-        $demandedProperties = [];
-
-        if (!$demandedProperties['or'] && !$demandedProperties['and']) {
-            if ($demands['or'] || $demands['and']) {
-                $or = ($demands['or']) ? 'or' : '';
-                $and = ($demands['and']) ? 'and' : '';
-
-                if ($or !== '') {
-                    foreach ($demands[$or] as $demandKey => $demand) {
-                        foreach ($properties as $key => $property) {
-                            foreach ($tables as $alias => $table) {
-                                if ($demandKey === $key && $table === $property['table']) {
-                                    $demandedProperties[$or][$key] = $property;
-                                }
-                            }
-                        }
-                    }
+        $configured = ConfigurationUtility::getExtensionConfiguration()['properties'] ?? [];
+        $resolved = [];
+        foreach ($demands as $key => $value) {
+            if (($key === 'and' || $key === 'or') && is_array($value)) {
+                $nested = $this->getPropertiesForDemandedTables($tables, $value);
+                if ($nested !== []) {
+                    $resolved[$key] = $nested;
                 }
-
-                if ($and !== '') {
-                    foreach ($demands[$and] as $demandKey => $demand) {
-                        foreach ($properties as $key => $property) {
-                            foreach ($tables as $alias => $table) {
-                                if ($demandKey === $key && $table === $property['table']) {
-                                    $demandedProperties[$and][$key] = $property;
-                                }
-                            }
-                        }
-                    }
-                }
+                continue;
             }
-        }
-
-        foreach ($tables as $alias => $table) {
-            foreach ($properties as $key => $property) {
-                if ($demandedProperties['or'][$key] || $demandedProperties['and'][$key]) {
-                    if ($table === $property['table']) {
-                        $demandedProperties['or'][$key]['alias'] = $alias;
-                    }
-                } else {
-                    if ($table === $property['table']) {
-                        $demandedProperties[$key] = $property;
-                        $demandedProperties[$key]['alias'] = $alias;
-                    }
-                }
+            $property = $configured[$key] ?? null;
+            if (!is_array($property) || !isset($property['table'], $property['field'])) {
+                continue;
             }
+            $alias = array_search($property['table'], $tables, true);
+            if ($alias === false) {
+                continue;
+            }
+            // Request-Daten dürfen ausschließlich Werte, niemals SQL-Konfiguration überschreiben.
+            $property['alias'] = $alias;
+            $property['value'] = is_array($value) && array_key_exists('value', $value) ? $value['value'] : $value;
+            $resolved[$key] = $property;
         }
-
-        $filteredDemands = $this->filterDemandedProperties($demandedProperties, $demands);
-
-        return array_merge_recursive($demandedProperties, $filteredDemands);
+        return $resolved;
     }
 
     /**
@@ -341,37 +305,23 @@ class DemandService implements \TYPO3\CMS\Core\SingletonInterface
      */
     public function getSortBy(array $table, QueryBuilder $queryBuilder): QueryBuilder
     {
-        $demands = $this->getDemandsFromDemandProviders();
-        $sortingArguments = $demands['orderBy'] ?? [];
-        $properties = ConfigurationUtility::getExtensionConfiguration()['properties'];
-
-        foreach ($sortingArguments as $argument) {
-            [$propertyName, $orderingDirection] = GeneralUtility::trimExplode(',', $argument);
-            $property = $properties[$propertyName];
-
-            if (null === $property) {
-                throw new \UnexpectedValueException(
-                    'Demanded property does not exist!'
-                );
+        $arguments = $this->getDemandsFromDemandProviders()['orderBy'] ?? [];
+        $properties = ConfigurationUtility::getExtensionConfiguration()['properties'] ?? [];
+        foreach (is_array($arguments) ? $arguments : [$arguments] as $argument) {
+            if (!is_string($argument)) {
+                continue;
             }
-
-            $propertyTable = $property['table'];
-            $propertyField = $property['field'];
-            $tableAlias = $propertyTable;
-
-            foreach ($table as $alias => $tableName) {
-                if ($propertyTable === $tableName) {
-                    $tableAlias = $alias;
-                }
+            [$name, $direction] = array_pad(GeneralUtility::trimExplode(',', $argument, false, 2), 2, 'ASC');
+            $property = $properties[$name] ?? null;
+            $direction = strtoupper($direction ?: 'ASC');
+            if (!is_array($property) || !isset($property['table'], $property['field']) || !in_array($direction, ['ASC', 'DESC'], true)) {
+                continue;
             }
-
-            if ($orderingDirection) {
-                $queryBuilder->addOrderBy($tableAlias . '.' . $propertyField, strtoupper($orderingDirection));
-            } else {
-                $queryBuilder->addOrderBy($tableAlias . '.' . $propertyField);
+            $alias = array_search($property['table'], $table, true);
+            if ($alias !== false) {
+                $queryBuilder->addOrderBy($alias . '.' . $property['field'], $direction);
             }
         }
-
         return $queryBuilder;
     }
 
@@ -384,20 +334,14 @@ class DemandService implements \TYPO3\CMS\Core\SingletonInterface
      */
     public function filterDemandedProperties(array $properties, array $demands): array
     {
-        $filteredProperties = [];
-
-        foreach ($demands as $key => $demand) {
-            foreach ($properties as $property) {
-                if ($key === 'or' || $key === 'and') {
-                    $filteredProperties[$key] = $this->filterDemandedProperties($properties, $demand);
-                } else {
-                    if (array_key_exists($key, $properties) || array_key_exists($key, $property)) {
-                        $filteredProperties[$key] = $demand;
-                    }
-                }
+        $filtered = [];
+        foreach ($demands as $key => $value) {
+            if (($key === 'and' || $key === 'or') && is_array($value)) {
+                $filtered[$key] = $this->filterDemandedProperties($properties[$key] ?? $properties, $value);
+            } elseif (array_key_exists($key, $properties)) {
+                $filtered[$key] = $value;
             }
         }
-
-        return $filteredProperties;
+        return $filtered;
     }
 }

@@ -3,9 +3,12 @@ services:
     autowire: true
     autoconfigure: true
     public: false
-
   Pixelant\Demander\:
-    resource: '../Classes/*'
-
+    resource: ../Classes/*
+    exclude:
+    - ../Classes/Service/RequestSingleton.php
   Pixelant\Demander\Service\DemandService:
+    public: true
+  Pixelant\Demander\DemandProvider\:
+    resource: ../Classes/DemandProvider/*
     public: true
